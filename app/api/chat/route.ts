@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateText } from 'ai';
+import { openai } from '@ai-sdk/openai';
 import { getServerSession } from 'next-auth';
-
-const apiKey = process.env.GEMINI_API_KEY;
 
 const SPECIALISTS: Record<string, {
     title: string;
@@ -51,10 +50,6 @@ function findMatchingSpecialist(message: string): { key: string; title: string }
         }
     }
     return null;
-}
-
-function isInScope(message: string, scope: string[]): boolean {
-    return scope.some(keyword => message.toLowerCase().includes(keyword));
 }
 
 function getResponse(message: string, specialty: string): string {
@@ -109,11 +104,10 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        if (apiKey) {
+        // Try Vercel AI SDK with OpenAI
+        const openaiApiKey = process.env.OPENAI_API_KEY;
+        if (openaiApiKey) {
             try {
-                const genAI = new GoogleGenerativeAI(apiKey);
-                const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash', generationConfig: { maxOutputTokens: 120 } });
-
                 const prompt = `You are a ${doc.title}. Your specialty: ${doc.scope.slice(0, 6).join(', ')}.
 
 RULES:
@@ -128,12 +122,21 @@ Patient says: "${message}"
 
 Respond naturally:`;
 
-                const result = await model.generateContent(prompt);
-                return NextResponse.json({ success: true, message: result.response.text() });
+                const { text } = await generateText({
+                    model: openai('gpt-4o-mini'),
+                    prompt: prompt,
+                    maxTokens: 100,
+                });
 
-            } catch { /* fallback */ }
+                return NextResponse.json({ success: true, message: text });
+
+            } catch (error) {
+                console.error('OpenAI API error:', error);
+                // Fall through to fallback response
+            }
         }
 
+        // Fallback to rule-based responses if no API key or API fails
         return NextResponse.json({ success: true, message: getResponse(message, specialty) });
 
     } catch {
