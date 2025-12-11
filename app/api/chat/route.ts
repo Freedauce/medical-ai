@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { createGroq } from '@ai-sdk/groq';
 import { getServerSession } from 'next-auth';
+
+// Initialize Groq with API key
+const groq = createGroq({
+    apiKey: process.env.GROQ_API_KEY,
+});
 
 const SPECIALISTS: Record<string, {
     title: string;
@@ -104,9 +109,9 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // Try Vercel AI SDK with OpenAI
-        const openaiApiKey = process.env.OPENAI_API_KEY;
-        if (openaiApiKey) {
+        // Try Groq AI (FREE!)
+        const groqApiKey = process.env.GROQ_API_KEY;
+        if (groqApiKey) {
             try {
                 const prompt = `You are a ${doc.title}. Your specialty: ${doc.scope.slice(0, 6).join(', ')}.
 
@@ -123,7 +128,7 @@ Patient says: "${message}"
 Respond naturally:`;
 
                 const { text } = await generateText({
-                    model: openai('gpt-4o-mini'),
+                    model: groq('llama-3.1-8b-instant'),
                     prompt: prompt,
                     maxTokens: 100,
                 });
@@ -131,7 +136,7 @@ Respond naturally:`;
                 return NextResponse.json({ success: true, message: text });
 
             } catch (error) {
-                console.error('OpenAI API error:', error);
+                console.error('Groq API error:', error);
                 // Fall through to fallback response
             }
         }
