@@ -35,7 +35,6 @@ export function VoiceRecorder({
             recognitionInstance.continuous = true;
             recognitionInstance.interimResults = true;
             recognitionInstance.lang = "en-US";
-            recognitionInstance.maxAlternatives = 1;
 
             recognitionInstance.onresult = (event) => {
                 let fullTranscript = "";
