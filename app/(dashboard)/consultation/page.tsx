@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -40,7 +40,20 @@ const SPECIALISTS: Record<string, { title: string; icon: React.ElementType; colo
     digestive: { title: "Stomach Doctor", icon: IconApple, color: "from-yellow-500 to-lime-500", medicines: ["Omeprazole 20mg - 1 before breakfast", "Loperamide 2mg - 2 initially, 1 after each loose stool"] },
 };
 
-export default function ConsultationPage() {
+// Loading component for Suspense fallback
+function ConsultationLoading() {
+    return (
+        <div className="flex h-[calc(100vh-120px)] items-center justify-center">
+            <div className="text-center">
+                <IconLoader2 className="mx-auto h-12 w-12 animate-spin text-blue-500" />
+                <p className="mt-4 text-neutral-600 dark:text-neutral-400">Loading consultation...</p>
+            </div>
+        </div>
+    );
+}
+
+// Main consultation content component
+function ConsultationContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const specialty = searchParams.get("specialty") || "general";
@@ -309,5 +322,14 @@ INSTRUCTIONS:
 
             {isSpeaking && <motion.div className="mt-3 flex items-center justify-center gap-2" animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1, repeat: Infinity }}><div className="flex gap-1">{[...Array(4)].map((_, i) => <motion.div key={i} className="h-3 w-1 rounded-full bg-green-500" animate={{ height: [12, 20, 12] }} transition={{ duration: 0.4, repeat: Infinity, delay: i * 0.1 }} />)}</div><span className="text-sm text-green-600">Speaking...</span></motion.div>}
         </div>
+    );
+}
+
+// Default export with Suspense boundary
+export default function ConsultationPage() {
+    return (
+        <Suspense fallback={<ConsultationLoading />}>
+            <ConsultationContent />
+        </Suspense>
     );
 }
