@@ -21,7 +21,9 @@ import {
     IconBrain,
     IconLungs,
     IconApple,
-    IconArrowRight
+    IconArrowRight,
+    IconSend,
+    IconKeyboard
 } from "@tabler/icons-react";
 import Link from "next/link";
 
@@ -40,7 +42,6 @@ const SPECIALISTS: Record<string, { title: string; icon: React.ElementType; colo
     digestive: { title: "Stomach Doctor", icon: IconApple, color: "from-yellow-500 to-lime-500", medicines: ["Omeprazole 20mg - 1 before breakfast", "Loperamide 2mg - 2 initially, 1 after each loose stool"] },
 };
 
-// Loading component for Suspense fallback
 function ConsultationLoading() {
     return (
         <div className="flex h-[calc(100vh-120px)] items-center justify-center">
@@ -52,7 +53,6 @@ function ConsultationLoading() {
     );
 }
 
-// Main consultation content component
 function ConsultationContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -68,16 +68,22 @@ function ConsultationContent() {
     const [showReport, setShowReport] = useState(false);
     const [report, setReport] = useState("");
     const [suggestedDoctor, setSuggestedDoctor] = useState<string | null>(null);
-    const [autoMode, setAutoMode] = useState(true); // Auto-listen mode
+    const [textInput, setTextInput] = useState("");
+    const [showTextInput, setShowTextInput] = useState(false);
 
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const finalTranscriptRef = useRef("");
+    const isListeningRef = useRef(false);
 
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-    // Initialize speech recognition
+    // Keep ref in sync with state
+    useEffect(() => {
+        isListeningRef.current = isListening;
+    }, [isListening]);
+
+    // Initialize speech recognition ONCE
     useEffect(() => {
         if (typeof window === "undefined") return;
 
@@ -85,77 +91,66 @@ function ConsultationContent() {
         if (!SpeechRecognition) return;
 
         const recognition = new SpeechRecognition();
-        recognition.continuous = false; // Stop after each phrase for cleaner results
+        recognition.continuous = true;
         recognition.interimResults = true;
         recognition.lang = "en-US";
 
         recognition.onresult = (event) => {
-            let interim = "";
-            let final = "";
+            let transcript = "";
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                transcript += event.results[i][0].transcript;
+            }
 
-            for (let i = 0; i < event.results.length; i++) {
-                const result = event.results[i];
-                if (result.isFinal) {
-                    final += result[0].transcript + " ";
-                } else {
-                    interim += result[0].transcript;
+            if (transcript.trim()) {
+                setCurrentTranscript(transcript);
+
+                // Reset silence timer
+                if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
+                // Check if we have a final result
+                const lastResult = event.results[event.results.length - 1];
+                if (lastResult.isFinal) {
+                    // Send after 1 second of silence after final result
+                    silenceTimerRef.current = setTimeout(() => {
+                        if (isListeningRef.current && transcript.trim()) {
+                            handleSendMessage(transcript.trim());
+                        }
+                    }, 1000);
                 }
-            }
-
-            // Build full transcript from final + interim
-            const fullTranscript = (finalTranscriptRef.current + final + interim).trim();
-            setCurrentTranscript(fullTranscript);
-
-            // If we got a final result, save it
-            if (final) {
-                finalTranscriptRef.current += final;
-            }
-
-            // Reset silence timer on any speech
-            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-
-            // Set silence timer - send after 1.5 seconds of silence
-            if (fullTranscript) {
-                silenceTimerRef.current = setTimeout(() => {
-                    if (isListening && fullTranscript.trim()) {
-                        sendMessage(fullTranscript.trim());
-                    }
-                }, 1500);
             }
         };
 
         recognition.onend = () => {
-            // Auto-restart if still in listening mode and not loading
-            if (isListening && !isLoading && !isSpeaking && autoMode) {
-                try {
-                    setTimeout(() => {
-                        if (isListening && recognitionRef.current) {
-                            recognitionRef.current.start();
-                        }
-                    }, 100);
-                } catch { }
+            // Auto-restart if still should be listening
+            if (isListeningRef.current) {
+                setTimeout(() => {
+                    try {
+                        recognition.start();
+                    } catch { }
+                }, 100);
             }
         };
 
-        recognition.onerror = () => { };
+        recognition.onerror = (event) => {
+            console.log("Speech error:", event.error);
+            if (event.error === "not-allowed") {
+                setIsListening(false);
+            }
+        };
 
         recognitionRef.current = recognition;
 
         return () => {
             if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+            try { recognition.stop(); } catch { }
         };
-    }, [isListening, isLoading, isSpeaking, autoMode]);
+    }, []);
 
-    // Auto-start listening when doctor finishes speaking
-    useEffect(() => {
-        if (!isSpeaking && autoMode && !isLoading && messages.length > 0) {
-            // Doctor finished speaking, auto-start listening
-            setTimeout(() => startListening(), 500);
+    const speak = useCallback((text: string, onComplete?: () => void) => {
+        if (typeof window === "undefined" || !window.speechSynthesis) {
+            onComplete?.();
+            return;
         }
-    }, [isSpeaking, autoMode, isLoading]);
-
-    const speak = useCallback((text: string) => {
-        if (typeof window === "undefined" || !window.speechSynthesis) return;
 
         // Stop listening while speaking
         stopListening();
@@ -168,12 +163,19 @@ function ConsultationContent() {
             voices.find(v => v.lang === "en-US");
         if (voice) utterance.voice = voice;
         utterance.rate = 0.95;
+
         utterance.onstart = () => setIsSpeaking(true);
         utterance.onend = () => {
             setIsSpeaking(false);
-            // Auto-start after speaking ends (handled by useEffect above)
+            onComplete?.();
+            // Auto-start listening after speaking
+            setTimeout(() => startListening(), 300);
         };
-        utterance.onerror = () => setIsSpeaking(false);
+        utterance.onerror = () => {
+            setIsSpeaking(false);
+            onComplete?.();
+        };
+
         window.speechSynthesis.speak(utterance);
     }, []);
 
@@ -182,35 +184,36 @@ function ConsultationContent() {
         setIsSpeaking(false);
     };
 
-    const startListening = () => {
+    const startListening = useCallback(() => {
         if (isLoading || isSpeaking) return;
 
-        // Clear previous transcript
         setCurrentTranscript("");
-        finalTranscriptRef.current = "";
-
         setIsListening(true);
+
         try {
             recognitionRef.current?.start();
         } catch { }
-    };
+    }, [isLoading, isSpeaking]);
 
-    const stopListening = () => {
+    const stopListening = useCallback(() => {
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
         setIsListening(false);
+        setCurrentTranscript("");
+
         try {
             recognitionRef.current?.stop();
         } catch { }
-    };
+    }, []);
 
-    const sendMessage = async (transcript: string) => {
+    const handleSendMessage = async (text: string) => {
+        const trimmedText = text.trim();
+        if (!trimmedText || isLoading) return;
+
         stopListening();
-
-        if (!transcript.trim()) return;
-
-        setMessages(prev => [...prev, { role: "user", content: transcript }]);
         setCurrentTranscript("");
-        finalTranscriptRef.current = "";
+        setTextInput("");
+
+        setMessages(prev => [...prev, { role: "user", content: trimmedText }]);
         setIsLoading(true);
         setSuggestedDoctor(null);
 
@@ -218,7 +221,7 @@ function ConsultationContent() {
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: transcript, specialty }),
+                body: JSON.stringify({ message: trimmedText, specialty }),
             });
             const data = await response.json();
 
@@ -229,14 +232,25 @@ function ConsultationContent() {
             setMessages(prev => [...prev, { role: "assistant", content: data.message, redirect: data.redirect }]);
             speak(data.message);
         } catch {
-            setMessages(prev => [...prev, { role: "assistant", content: "Sorry, I had trouble understanding. Please try again." }]);
+            const errorMsg = "Sorry, I had trouble understanding. Please try again.";
+            setMessages(prev => [...prev, { role: "assistant", content: errorMsg }]);
+            speak(errorMsg);
         } finally {
             setIsLoading(false);
         }
     };
 
+    const handleTextSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (textInput.trim()) {
+            handleSendMessage(textInput);
+        }
+    };
+
     const goToSuggestedDoctor = () => {
         if (suggestedDoctor) {
+            stopListening();
+            stopSpeaking();
             router.push(`/consultation?specialty=${suggestedDoctor}`);
             setSuggestedDoctor(null);
             setMessages([]);
@@ -246,7 +260,6 @@ function ConsultationContent() {
     const generateReport = () => {
         stopSpeaking();
         stopListening();
-        setAutoMode(false);
 
         const symptoms = messages.filter(m => m.role === "user").map(m => `• ${m.content}`).join("\n");
         const consultation = messages.filter(m => m.role === "assistant" && !m.redirect).slice(1).map(m => `• ${m.content}`).join("\n");
@@ -300,7 +313,6 @@ INSTRUCTIONS:
     const resetConsultation = () => {
         setShowReport(false);
         setSuggestedDoctor(null);
-        setAutoMode(true);
         const greeting = `Hello! I'm your ${doc.title}. What symptoms are you experiencing?`;
         setMessages([{ role: "assistant", content: greeting }]);
         setTimeout(() => speak(greeting), 300);
@@ -311,24 +323,28 @@ INSTRUCTIONS:
         const greeting = `Hello! I'm your ${doc.title}. What symptoms are you experiencing?`;
         setMessages([{ role: "assistant", content: greeting }]);
         setSuggestedDoctor(null);
-        setAutoMode(true);
         setTimeout(() => speak(greeting), 500);
+
+        return () => {
+            stopListening();
+            stopSpeaking();
+        };
     }, [specialty]);
 
     if (showReport) {
         return (
             <div className="flex h-[calc(100vh-120px)] flex-col">
                 <div className="mb-4 flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">📋 Your Prescription</h1>
+                    <h1 className="text-xl sm:text-2xl font-bold">📋 Your Prescription</h1>
                     <button onClick={() => setShowReport(false)} className="p-2 hover:bg-neutral-100 rounded-lg dark:hover:bg-neutral-800"><IconX className="h-5 w-5" /></button>
                 </div>
-                <div className="flex-1 overflow-y-auto rounded-2xl border bg-neutral-50 p-6 font-mono text-sm dark:bg-neutral-900 dark:border-neutral-800">
+                <div className="flex-1 overflow-y-auto rounded-2xl border bg-neutral-50 p-4 sm:p-6 font-mono text-xs sm:text-sm dark:bg-neutral-900 dark:border-neutral-800">
                     <pre className="whitespace-pre-wrap">{report}</pre>
                 </div>
-                <div className="mt-4 flex gap-3 flex-wrap">
-                    <button onClick={downloadReport} className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-green-500 px-6 py-3 text-white font-medium"><IconDownload className="h-5 w-5" /> Download</button>
-                    <button onClick={resetConsultation} className="flex items-center gap-2 rounded-xl border px-6 py-3 dark:border-neutral-700"><IconCheck className="h-5 w-5" /> New Consultation</button>
-                    <Link href="/dashboard" className="flex items-center gap-2 rounded-xl border px-6 py-3 dark:border-neutral-700"><IconArrowLeft className="h-5 w-5" /> Dashboard</Link>
+                <div className="mt-4 flex gap-2 sm:gap-3 flex-wrap">
+                    <button onClick={downloadReport} className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-green-500 px-4 sm:px-6 py-2 sm:py-3 text-white font-medium text-sm"><IconDownload className="h-4 w-4 sm:h-5 sm:w-5" /> Download</button>
+                    <button onClick={resetConsultation} className="flex items-center gap-2 rounded-xl border px-4 sm:px-6 py-2 sm:py-3 dark:border-neutral-700 text-sm"><IconCheck className="h-4 w-4 sm:h-5 sm:w-5" /> New</button>
+                    <Link href="/dashboard" className="flex items-center gap-2 rounded-xl border px-4 sm:px-6 py-2 sm:py-3 dark:border-neutral-700 text-sm"><IconArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" /> Back</Link>
                 </div>
             </div>
         );
@@ -337,36 +353,32 @@ INSTRUCTIONS:
     return (
         <div className="flex h-[calc(100vh-120px)] flex-col">
             {/* Header */}
-            <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
+            <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 sm:gap-3">
                     <Link href="/dashboard" className="p-2 hover:bg-neutral-100 rounded-lg dark:hover:bg-neutral-800"><IconArrowLeft className="h-5 w-5" /></Link>
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br ${doc.color}`}><DocIcon className="h-6 w-6 text-white" /></div>
+                    <div className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-gradient-to-br ${doc.color}`}><DocIcon className="h-5 w-5 sm:h-6 sm:w-6 text-white" /></div>
                     <div>
-                        <h1 className="font-bold text-neutral-900 dark:text-white">{doc.title}</h1>
-                        <p className="text-xs text-green-500">● Online • {autoMode ? "Auto-listening" : "Manual mode"}</p>
+                        <h1 className="font-bold text-sm sm:text-base text-neutral-900 dark:text-white">{doc.title}</h1>
+                        <p className="text-xs text-green-500">● Online</p>
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    {isSpeaking && <button onClick={stopSpeaking} className="flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-sm text-red-600"><IconVolumeOff className="h-4 w-4" /> Stop</button>}
-                    <button onClick={() => setAutoMode(!autoMode)} className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm ${autoMode ? 'bg-green-100 text-green-600' : 'bg-neutral-100 text-neutral-600'}`}>
-                        {autoMode ? <IconMicrophone className="h-4 w-4" /> : <IconMicrophoneOff className="h-4 w-4" />}
-                        {autoMode ? "Auto" : "Manual"}
-                    </button>
-                    {messages.length > 1 && !suggestedDoctor && <button onClick={generateReport} className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 px-4 py-2 text-white font-medium"><IconFileText className="h-5 w-5" /> Get Prescription</button>}
+                <div className="flex gap-1 sm:gap-2">
+                    {isSpeaking && <button onClick={stopSpeaking} className="flex items-center gap-1 rounded-lg bg-red-100 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-red-600"><IconVolumeOff className="h-4 w-4" /><span className="hidden sm:inline">Stop</span></button>}
+                    {messages.length > 1 && !suggestedDoctor && <button onClick={generateReport} className="flex items-center gap-1 sm:gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 px-3 sm:px-4 py-1.5 sm:py-2 text-white font-medium text-xs sm:text-sm"><IconFileText className="h-4 w-4 sm:h-5 sm:w-5" /><span className="hidden sm:inline">Prescription</span></button>}
                 </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto rounded-2xl border bg-white p-4 dark:bg-neutral-900 dark:border-neutral-800">
+            <div className="flex-1 overflow-y-auto rounded-2xl border bg-white p-3 sm:p-4 dark:bg-neutral-900 dark:border-neutral-800">
                 <AnimatePresence>
                     {messages.map((msg, i) => (
-                        <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`mb-4 flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                            <div className={`flex max-w-[85%] gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-                                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${msg.role === "user" ? "bg-blue-500" : `bg-gradient-to-br ${doc.color}`}`}>
-                                    {msg.role === "user" ? <IconUser className="h-4 w-4 text-white" /> : <DocIcon className="h-4 w-4 text-white" />}
+                        <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`mb-3 sm:mb-4 flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                            <div className={`flex max-w-[90%] sm:max-w-[85%] gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                                <div className={`flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full ${msg.role === "user" ? "bg-blue-500" : `bg-gradient-to-br ${doc.color}`}`}>
+                                    {msg.role === "user" ? <IconUser className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" /> : <DocIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />}
                                 </div>
-                                <div className={`rounded-2xl px-4 py-2 ${msg.role === "user" ? "bg-blue-500 text-white" : "bg-neutral-100 dark:bg-neutral-800"}`}>
-                                    <p className="text-sm">{msg.content}</p>
+                                <div className={`rounded-2xl px-3 sm:px-4 py-2 ${msg.role === "user" ? "bg-blue-500 text-white" : "bg-neutral-100 dark:bg-neutral-800"}`}>
+                                    <p className="text-xs sm:text-sm">{msg.content}</p>
                                     {msg.role === "assistant" && !msg.redirect && <button onClick={() => speak(msg.content)} className="mt-1 text-xs text-neutral-400 hover:text-blue-500 flex items-center gap-1"><IconVolume className="h-3 w-3" /> Replay</button>}
                                 </div>
                             </div>
@@ -374,12 +386,17 @@ INSTRUCTIONS:
                     ))}
                 </AnimatePresence>
 
-                {isLoading && <div className="flex gap-2 mb-4"><div className={`flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br ${doc.color}`}><DocIcon className="h-4 w-4 text-white" /></div><div className="flex items-center gap-2 rounded-2xl bg-neutral-100 px-4 py-2 dark:bg-neutral-800"><IconLoader2 className="h-4 w-4 animate-spin" /> Thinking...</div></div>}
+                {isLoading && (
+                    <div className="flex gap-2 mb-3">
+                        <div className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-gradient-to-br ${doc.color}`}><DocIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" /></div>
+                        <div className="flex items-center gap-2 rounded-2xl bg-neutral-100 px-3 sm:px-4 py-2 dark:bg-neutral-800"><IconLoader2 className="h-4 w-4 animate-spin" /> <span className="text-xs sm:text-sm">Thinking...</span></div>
+                    </div>
+                )}
 
                 {/* Live transcript */}
                 {isListening && currentTranscript && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-end mb-4">
-                        <div className="rounded-2xl bg-blue-100 px-4 py-2 text-sm text-blue-700 dark:bg-blue-900/30">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-end mb-3">
+                        <div className="rounded-2xl bg-blue-100 px-3 sm:px-4 py-2 text-xs sm:text-sm text-blue-700 dark:bg-blue-900/30 max-w-[90%]">
                             {currentTranscript}
                             <span className="ml-2 inline-block h-2 w-2 animate-pulse rounded-full bg-blue-500" />
                         </div>
@@ -391,55 +408,72 @@ INSTRUCTIONS:
             {/* Suggested Doctor Button */}
             {suggestedDoctor && SPECIALISTS[suggestedDoctor] && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-3">
-                    <button onClick={goToSuggestedDoctor} className={`w-full flex items-center justify-center gap-3 rounded-xl bg-gradient-to-r ${SPECIALISTS[suggestedDoctor].color} px-6 py-4 text-white font-medium shadow-lg`}>
-                        {(() => { const Icon = SPECIALISTS[suggestedDoctor].icon; return <Icon className="h-6 w-6" />; })()}
+                    <button onClick={goToSuggestedDoctor} className={`w-full flex items-center justify-center gap-2 sm:gap-3 rounded-xl bg-gradient-to-r ${SPECIALISTS[suggestedDoctor].color} px-4 sm:px-6 py-3 sm:py-4 text-white font-medium shadow-lg text-sm sm:text-base`}>
+                        {(() => { const Icon = SPECIALISTS[suggestedDoctor].icon; return <Icon className="h-5 w-5 sm:h-6 sm:w-6" />; })()}
                         Go to {SPECIALISTS[suggestedDoctor].title}
-                        <IconArrowRight className="h-5 w-5" />
+                        <IconArrowRight className="h-4 w-4 sm:h-5 sm:w-5" />
                     </button>
                 </motion.div>
             )}
 
-            {/* Status Bar */}
-            <div className="mt-4 flex items-center justify-center gap-4">
-                {!autoMode && (
+            {/* Input Area */}
+            <div className="mt-3 space-y-2">
+                {/* Text Input (toggleable) */}
+                {showTextInput && (
+                    <form onSubmit={handleTextSubmit} className="flex gap-2">
+                        <input
+                            type="text"
+                            value={textInput}
+                            onChange={(e) => setTextInput(e.target.value)}
+                            placeholder="Type your message..."
+                            className="flex-1 rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
+                            disabled={isLoading}
+                        />
+                        <button
+                            type="submit"
+                            disabled={isLoading || !textInput.trim()}
+                            className={`flex items-center justify-center rounded-xl px-4 py-3 text-white bg-gradient-to-r ${doc.color} disabled:opacity-50`}
+                        >
+                            <IconSend className="h-5 w-5" />
+                        </button>
+                    </form>
+                )}
+
+                {/* Control buttons */}
+                <div className="flex items-center justify-center gap-3">
+                    {/* Toggle text input */}
+                    <button
+                        onClick={() => setShowTextInput(!showTextInput)}
+                        className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${showTextInput ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30' : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400'}`}
+                    >
+                        <IconKeyboard className="h-5 w-5" />
+                        <span className="hidden sm:inline">Type</span>
+                    </button>
+
+                    {/* Microphone button */}
                     <motion.button
                         onClick={isListening ? stopListening : startListening}
                         disabled={isLoading || isSpeaking}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        className={`flex h-14 w-14 items-center justify-center rounded-full shadow-lg disabled:opacity-50 ${isListening ? 'bg-red-500' : `bg-gradient-to-br ${doc.color}`} text-white`}
+                        className={`flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full shadow-lg disabled:opacity-50 transition-all ${isListening ? 'bg-red-500 animate-pulse' : `bg-gradient-to-br ${doc.color}`} text-white`}
                     >
-                        {isListening ? <IconMicrophoneOff className="h-6 w-6" /> : <IconMicrophone className="h-6 w-6" />}
+                        {isListening ? <IconMicrophoneOff className="h-6 w-6 sm:h-7 sm:w-7" /> : <IconMicrophone className="h-6 w-6 sm:h-7 sm:w-7" />}
                     </motion.button>
-                )}
 
-                <div className="flex items-center gap-2 text-sm text-neutral-500">
-                    {isSpeaking && (
-                        <motion.div className="flex items-center gap-2 text-green-600" animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1, repeat: Infinity }}>
-                            <div className="flex gap-1">
-                                {[...Array(4)].map((_, i) => <motion.div key={i} className="h-3 w-1 rounded-full bg-green-500" animate={{ height: [12, 20, 12] }} transition={{ duration: 0.4, repeat: Infinity, delay: i * 0.1 }} />)}
-                            </div>
-                            Doctor speaking...
-                        </motion.div>
-                    )}
-                    {isListening && !isSpeaking && (
-                        <motion.div className="flex items-center gap-2 text-blue-600" animate={{ opacity: [1, 0.7, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
-                            <div className="flex gap-1">
-                                {[...Array(4)].map((_, i) => <motion.div key={i} className="h-3 w-1 rounded-full bg-blue-500" animate={{ height: [8, 16, 8] }} transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.15 }} />)}
-                            </div>
-                            Listening... speak naturally
-                        </motion.div>
-                    )}
-                    {!isListening && !isSpeaking && !isLoading && autoMode && (
-                        <span className="text-neutral-400">Waiting for doctor to respond...</span>
-                    )}
+                    {/* Status indicator */}
+                    <div className="w-20 sm:w-24 text-center">
+                        {isSpeaking && <span className="text-xs sm:text-sm text-green-600">🔊 Speaking</span>}
+                        {isListening && !isSpeaking && <span className="text-xs sm:text-sm text-blue-600">🎤 Listening</span>}
+                        {isLoading && <span className="text-xs sm:text-sm text-neutral-500">⏳ Thinking</span>}
+                        {!isSpeaking && !isListening && !isLoading && <span className="text-xs sm:text-sm text-neutral-400">Tap mic</span>}
+                    </div>
                 </div>
             </div>
         </div>
     );
 }
 
-// Default export with Suspense boundary
 export default function ConsultationPage() {
     return (
         <Suspense fallback={<ConsultationLoading />}>
