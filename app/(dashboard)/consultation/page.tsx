@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
     IconMicrophone,
-    IconPlayerStop,
+    IconMicrophoneOff,
     IconVolume,
     IconVolumeOff,
     IconLoader2,
@@ -61,55 +61,105 @@ function ConsultationContent() {
     const DocIcon = doc.icon;
 
     const [messages, setMessages] = useState<Message[]>([]);
-    const [isRecording, setIsRecording] = useState(false);
+    const [isListening, setIsListening] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [currentTranscript, setCurrentTranscript] = useState("");
-    const [error, setError] = useState("");
     const [showReport, setShowReport] = useState(false);
     const [report, setReport] = useState("");
     const [suggestedDoctor, setSuggestedDoctor] = useState<string | null>(null);
+    const [autoMode, setAutoMode] = useState(true); // Auto-listen mode
 
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const lastTranscriptRef = useRef("");
+    const finalTranscriptRef = useRef("");
 
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
+    // Initialize speech recognition
     useEffect(() => {
-        if (isRecording && currentTranscript) {
-            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-            silenceTimerRef.current = setTimeout(() => {
-                if (currentTranscript === lastTranscriptRef.current && currentTranscript.trim()) stopRecordingAndSend();
-            }, 2000);
-            lastTranscriptRef.current = currentTranscript;
-        }
-        return () => { if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current); };
-    }, [currentTranscript, isRecording]);
+        if (typeof window === "undefined") return;
 
-    useEffect(() => {
-        if (typeof window !== "undefined") {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SpeechRecognition) {
-                const recognition = new SpeechRecognition();
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                recognition.lang = "en-US";
-                recognition.onresult = (event) => {
-                    let t = "";
-                    for (let i = 0; i < event.results.length; i++) t += event.results[i][0].transcript;
-                    setCurrentTranscript(t);
-                };
-                recognition.onerror = () => { };
-                recognition.onend = () => { if (isRecording) try { recognition.start(); } catch { } };
-                recognitionRef.current = recognition;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) return;
+
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false; // Stop after each phrase for cleaner results
+        recognition.interimResults = true;
+        recognition.lang = "en-US";
+
+        recognition.onresult = (event) => {
+            let interim = "";
+            let final = "";
+
+            for (let i = 0; i < event.results.length; i++) {
+                const result = event.results[i];
+                if (result.isFinal) {
+                    final += result[0].transcript + " ";
+                } else {
+                    interim += result[0].transcript;
+                }
             }
+
+            // Build full transcript from final + interim
+            const fullTranscript = (finalTranscriptRef.current + final + interim).trim();
+            setCurrentTranscript(fullTranscript);
+
+            // If we got a final result, save it
+            if (final) {
+                finalTranscriptRef.current += final;
+            }
+
+            // Reset silence timer on any speech
+            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
+            // Set silence timer - send after 1.5 seconds of silence
+            if (fullTranscript) {
+                silenceTimerRef.current = setTimeout(() => {
+                    if (isListening && fullTranscript.trim()) {
+                        sendMessage(fullTranscript.trim());
+                    }
+                }, 1500);
+            }
+        };
+
+        recognition.onend = () => {
+            // Auto-restart if still in listening mode and not loading
+            if (isListening && !isLoading && !isSpeaking && autoMode) {
+                try {
+                    setTimeout(() => {
+                        if (isListening && recognitionRef.current) {
+                            recognitionRef.current.start();
+                        }
+                    }, 100);
+                } catch { }
+            }
+        };
+
+        recognition.onerror = () => { };
+
+        recognitionRef.current = recognition;
+
+        return () => {
+            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        };
+    }, [isListening, isLoading, isSpeaking, autoMode]);
+
+    // Auto-start listening when doctor finishes speaking
+    useEffect(() => {
+        if (!isSpeaking && autoMode && !isLoading && messages.length > 0) {
+            // Doctor finished speaking, auto-start listening
+            setTimeout(() => startListening(), 500);
         }
-    }, [isRecording]);
+    }, [isSpeaking, autoMode, isLoading]);
 
     const speak = useCallback((text: string) => {
         if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+        // Stop listening while speaking
+        stopListening();
+
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         const voices = window.speechSynthesis.getVoices();
@@ -119,24 +169,48 @@ function ConsultationContent() {
         if (voice) utterance.voice = voice;
         utterance.rate = 0.95;
         utterance.onstart = () => setIsSpeaking(true);
-        utterance.onend = () => setIsSpeaking(false);
+        utterance.onend = () => {
+            setIsSpeaking(false);
+            // Auto-start after speaking ends (handled by useEffect above)
+        };
         utterance.onerror = () => setIsSpeaking(false);
         window.speechSynthesis.speak(utterance);
     }, []);
 
-    const stopSpeaking = () => { window.speechSynthesis?.cancel(); setIsSpeaking(false); };
-    const startRecording = () => { setCurrentTranscript(""); lastTranscriptRef.current = ""; setError(""); setIsRecording(true); try { recognitionRef.current?.start(); } catch { } };
+    const stopSpeaking = () => {
+        window.speechSynthesis?.cancel();
+        setIsSpeaking(false);
+    };
 
-    const stopRecordingAndSend = async () => {
+    const startListening = () => {
+        if (isLoading || isSpeaking) return;
+
+        // Clear previous transcript
+        setCurrentTranscript("");
+        finalTranscriptRef.current = "";
+
+        setIsListening(true);
+        try {
+            recognitionRef.current?.start();
+        } catch { }
+    };
+
+    const stopListening = () => {
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-        setIsRecording(false);
-        recognitionRef.current?.stop();
+        setIsListening(false);
+        try {
+            recognitionRef.current?.stop();
+        } catch { }
+    };
 
-        const transcript = currentTranscript.trim() || lastTranscriptRef.current.trim();
-        if (!transcript) { setError("I didn't hear anything."); return; }
+    const sendMessage = async (transcript: string) => {
+        stopListening();
+
+        if (!transcript.trim()) return;
 
         setMessages(prev => [...prev, { role: "user", content: transcript }]);
         setCurrentTranscript("");
+        finalTranscriptRef.current = "";
         setIsLoading(true);
         setSuggestedDoctor(null);
 
@@ -148,7 +222,6 @@ function ConsultationContent() {
             });
             const data = await response.json();
 
-            // Check if there's a redirect suggestion
             if (data.redirect && data.redirect !== specialty) {
                 setSuggestedDoctor(data.redirect);
             }
@@ -156,7 +229,7 @@ function ConsultationContent() {
             setMessages(prev => [...prev, { role: "assistant", content: data.message, redirect: data.redirect }]);
             speak(data.message);
         } catch {
-            setError("Connection error.");
+            setMessages(prev => [...prev, { role: "assistant", content: "Sorry, I had trouble understanding. Please try again." }]);
         } finally {
             setIsLoading(false);
         }
@@ -165,7 +238,6 @@ function ConsultationContent() {
     const goToSuggestedDoctor = () => {
         if (suggestedDoctor) {
             router.push(`/consultation?specialty=${suggestedDoctor}`);
-            // Reset for new doctor
             setSuggestedDoctor(null);
             setMessages([]);
         }
@@ -173,6 +245,9 @@ function ConsultationContent() {
 
     const generateReport = () => {
         stopSpeaking();
+        stopListening();
+        setAutoMode(false);
+
         const symptoms = messages.filter(m => m.role === "user").map(m => `• ${m.content}`).join("\n");
         const consultation = messages.filter(m => m.role === "assistant" && !m.redirect).slice(1).map(m => `• ${m.content}`).join("\n");
 
@@ -225,15 +300,18 @@ INSTRUCTIONS:
     const resetConsultation = () => {
         setShowReport(false);
         setSuggestedDoctor(null);
+        setAutoMode(true);
         const greeting = `Hello! I'm your ${doc.title}. What symptoms are you experiencing?`;
         setMessages([{ role: "assistant", content: greeting }]);
         setTimeout(() => speak(greeting), 300);
     };
 
+    // Initial greeting
     useEffect(() => {
         const greeting = `Hello! I'm your ${doc.title}. What symptoms are you experiencing?`;
         setMessages([{ role: "assistant", content: greeting }]);
         setSuggestedDoctor(null);
+        setAutoMode(true);
         setTimeout(() => speak(greeting), 500);
     }, [specialty]);
 
@@ -258,21 +336,27 @@ INSTRUCTIONS:
 
     return (
         <div className="flex h-[calc(100vh-120px)] flex-col">
+            {/* Header */}
             <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <Link href="/dashboard" className="p-2 hover:bg-neutral-100 rounded-lg dark:hover:bg-neutral-800"><IconArrowLeft className="h-5 w-5" /></Link>
                     <div className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br ${doc.color}`}><DocIcon className="h-6 w-6 text-white" /></div>
                     <div>
                         <h1 className="font-bold text-neutral-900 dark:text-white">{doc.title}</h1>
-                        <p className="text-xs text-green-500">● Online</p>
+                        <p className="text-xs text-green-500">● Online • {autoMode ? "Auto-listening" : "Manual mode"}</p>
                     </div>
                 </div>
                 <div className="flex gap-2">
                     {isSpeaking && <button onClick={stopSpeaking} className="flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-sm text-red-600"><IconVolumeOff className="h-4 w-4" /> Stop</button>}
+                    <button onClick={() => setAutoMode(!autoMode)} className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm ${autoMode ? 'bg-green-100 text-green-600' : 'bg-neutral-100 text-neutral-600'}`}>
+                        {autoMode ? <IconMicrophone className="h-4 w-4" /> : <IconMicrophoneOff className="h-4 w-4" />}
+                        {autoMode ? "Auto" : "Manual"}
+                    </button>
                     {messages.length > 1 && !suggestedDoctor && <button onClick={generateReport} className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 px-4 py-2 text-white font-medium"><IconFileText className="h-5 w-5" /> Get Prescription</button>}
                 </div>
             </div>
 
+            {/* Messages */}
             <div className="flex-1 overflow-y-auto rounded-2xl border bg-white p-4 dark:bg-neutral-900 dark:border-neutral-800">
                 <AnimatePresence>
                     {messages.map((msg, i) => (
@@ -291,19 +375,23 @@ INSTRUCTIONS:
                 </AnimatePresence>
 
                 {isLoading && <div className="flex gap-2 mb-4"><div className={`flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br ${doc.color}`}><DocIcon className="h-4 w-4 text-white" /></div><div className="flex items-center gap-2 rounded-2xl bg-neutral-100 px-4 py-2 dark:bg-neutral-800"><IconLoader2 className="h-4 w-4 animate-spin" /> Thinking...</div></div>}
-                {isRecording && currentTranscript && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-end mb-4"><div className="rounded-2xl bg-blue-100 px-4 py-2 text-sm text-blue-700 dark:bg-blue-900/30">{currentTranscript}<span className="ml-1 text-xs opacity-50">(2s)</span></div></motion.div>}
+
+                {/* Live transcript */}
+                {isListening && currentTranscript && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-end mb-4">
+                        <div className="rounded-2xl bg-blue-100 px-4 py-2 text-sm text-blue-700 dark:bg-blue-900/30">
+                            {currentTranscript}
+                            <span className="ml-2 inline-block h-2 w-2 animate-pulse rounded-full bg-blue-500" />
+                        </div>
+                    </motion.div>
+                )}
                 <div ref={messagesEndRef} />
             </div>
-
-            {error && <div className="mt-2 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
 
             {/* Suggested Doctor Button */}
             {suggestedDoctor && SPECIALISTS[suggestedDoctor] && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-3">
-                    <button
-                        onClick={goToSuggestedDoctor}
-                        className={`w-full flex items-center justify-center gap-3 rounded-xl bg-gradient-to-r ${SPECIALISTS[suggestedDoctor].color} px-6 py-4 text-white font-medium shadow-lg`}
-                    >
+                    <button onClick={goToSuggestedDoctor} className={`w-full flex items-center justify-center gap-3 rounded-xl bg-gradient-to-r ${SPECIALISTS[suggestedDoctor].color} px-6 py-4 text-white font-medium shadow-lg`}>
                         {(() => { const Icon = SPECIALISTS[suggestedDoctor].icon; return <Icon className="h-6 w-6" />; })()}
                         Go to {SPECIALISTS[suggestedDoctor].title}
                         <IconArrowRight className="h-5 w-5" />
@@ -311,16 +399,42 @@ INSTRUCTIONS:
                 </motion.div>
             )}
 
-            <div className="mt-4 flex items-center justify-center gap-3">
-                {!isRecording ? (
-                    <motion.button onClick={startRecording} disabled={isLoading} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className={`flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${doc.color} text-white shadow-lg disabled:opacity-50`}><IconMicrophone className="h-7 w-7" /></motion.button>
-                ) : (
-                    <motion.button onClick={stopRecordingAndSend} animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white shadow-lg"><IconPlayerStop className="h-7 w-7" /></motion.button>
+            {/* Status Bar */}
+            <div className="mt-4 flex items-center justify-center gap-4">
+                {!autoMode && (
+                    <motion.button
+                        onClick={isListening ? stopListening : startListening}
+                        disabled={isLoading || isSpeaking}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className={`flex h-14 w-14 items-center justify-center rounded-full shadow-lg disabled:opacity-50 ${isListening ? 'bg-red-500' : `bg-gradient-to-br ${doc.color}`} text-white`}
+                    >
+                        {isListening ? <IconMicrophoneOff className="h-6 w-6" /> : <IconMicrophone className="h-6 w-6" />}
+                    </motion.button>
                 )}
-                <p className="text-sm text-neutral-500">{isRecording ? "Listening..." : "Tap to speak"}</p>
-            </div>
 
-            {isSpeaking && <motion.div className="mt-3 flex items-center justify-center gap-2" animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1, repeat: Infinity }}><div className="flex gap-1">{[...Array(4)].map((_, i) => <motion.div key={i} className="h-3 w-1 rounded-full bg-green-500" animate={{ height: [12, 20, 12] }} transition={{ duration: 0.4, repeat: Infinity, delay: i * 0.1 }} />)}</div><span className="text-sm text-green-600">Speaking...</span></motion.div>}
+                <div className="flex items-center gap-2 text-sm text-neutral-500">
+                    {isSpeaking && (
+                        <motion.div className="flex items-center gap-2 text-green-600" animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1, repeat: Infinity }}>
+                            <div className="flex gap-1">
+                                {[...Array(4)].map((_, i) => <motion.div key={i} className="h-3 w-1 rounded-full bg-green-500" animate={{ height: [12, 20, 12] }} transition={{ duration: 0.4, repeat: Infinity, delay: i * 0.1 }} />)}
+                            </div>
+                            Doctor speaking...
+                        </motion.div>
+                    )}
+                    {isListening && !isSpeaking && (
+                        <motion.div className="flex items-center gap-2 text-blue-600" animate={{ opacity: [1, 0.7, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
+                            <div className="flex gap-1">
+                                {[...Array(4)].map((_, i) => <motion.div key={i} className="h-3 w-1 rounded-full bg-blue-500" animate={{ height: [8, 16, 8] }} transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.15 }} />)}
+                            </div>
+                            Listening... speak naturally
+                        </motion.div>
+                    )}
+                    {!isListening && !isSpeaking && !isLoading && autoMode && (
+                        <span className="text-neutral-400">Waiting for doctor to respond...</span>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
