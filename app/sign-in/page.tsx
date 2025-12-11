@@ -1,13 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { motion } from "motion/react";
 import { IconBrandGoogle, IconStethoscope, IconMail, IconLock, IconLoader2 } from "@tabler/icons-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-export default function SignInPage() {
+// Loading fallback component
+function SignInLoading() {
+    return (
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-neutral-950 dark:via-neutral-900 dark:to-neutral-950">
+            <div className="text-center">
+                <IconLoader2 className="mx-auto h-12 w-12 animate-spin text-blue-500" />
+                <p className="mt-4 text-neutral-600 dark:text-neutral-400">Loading...</p>
+            </div>
+        </div>
+    );
+}
+
+// Sign-in content component that uses useSearchParams
+function SignInContent() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -168,5 +181,14 @@ export default function SignInPage() {
                 </div>
             </motion.div>
         </div>
+    );
+}
+
+// Default export with Suspense boundary
+export default function SignInPage() {
+    return (
+        <Suspense fallback={<SignInLoading />}>
+            <SignInContent />
+        </Suspense>
     );
 }
