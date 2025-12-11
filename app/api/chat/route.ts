@@ -14,7 +14,7 @@ const SPECIALISTS: Record<string, {
     },
     eye: {
         title: "Eye Doctor",
-        scope: ["eye", "vision", "sight", "blind", "blur", "red eye", "itchy eye", "watery", "conjunctivitis", "glasses", "cataract", "see", "eyes"],
+        scope: ["eye", "vision", "sight", "blind", "blur", "red eye", "itchy eye", "watery", "conjunctivitis", "glasses", "cataract", "see", "eyes", "night"],
         medicines: ["Artificial Tears", "Tobramycin eye drops", "Ciprofloxacin eye drops"]
     },
     orthopedic: {
@@ -51,7 +51,8 @@ function findMatchingSpecialist(message: string): { key: string; title: string }
     return null;
 }
 
-function getResponse(message: string, specialty: string): string {
+// Better fallback responses based on context
+function getSmartResponse(message: string, specialty: string): string {
     const doc = SPECIALISTS[specialty] || SPECIALISTS.general;
     const lower = message.toLowerCase();
 
@@ -63,17 +64,40 @@ function getResponse(message: string, specialty: string): string {
         return "You're welcome. Take care, and come back if you need anything.";
     }
 
-    // Check if symptoms match a DIFFERENT specialist
-    const matchingSpec = findMatchingSpecialist(message);
-    if (matchingSpec && matchingSpec.key !== specialty) {
-        return `Those symptoms sound like they need attention from our ${matchingSpec.title}. Please go back to the dashboard and select "${matchingSpec.title}" for the best care.`;
+    // More specific responses based on keywords
+    if (lower.includes('night') || lower.includes('dark')) {
+        return "Night vision problems can have several causes. How long have you been experiencing this? Do you also have trouble in dim lighting?";
     }
 
-    // In scope - give consultation response
-    if (lower.includes('pain')) return "I understand you're in pain. Can you rate it from 1 to 10? How long have you had this?";
-    if (lower.includes('how long')) return "That's helpful information. Is there anything that makes it better or worse?";
+    if (lower.includes('severe') || lower.includes('bad') || lower.includes('worse')) {
+        return "I'm sorry to hear it's severe. Have you experienced any other symptoms like pain, headaches, or sensitivity to light?";
+    }
 
-    return "I understand. Tell me more about when this started and how severe it is.";
+    if (lower.includes('started') || lower.includes('ago') || lower.includes('days') || lower.includes('week')) {
+        return "Thank you for that information. Has it been getting progressively worse, or has it stayed the same since it started?";
+    }
+
+    if (lower.includes('pain')) {
+        return "I understand you're in pain. Can you rate it from 1 to 10? Does anything make it better or worse?";
+    }
+
+    if (lower.includes('can\'t see') || lower.includes('cannot see') || lower.includes('don\'t see')) {
+        return "Vision problems are concerning. Is the blurriness constant or does it come and go? Any pain or redness?";
+    }
+
+    if (lower.includes('blur') || lower.includes('blurry')) {
+        return "Blurry vision can have many causes. Is it in one eye or both? Do you wear glasses or contacts?";
+    }
+
+    // Default follow-up questions
+    const followUps = [
+        "I see. Can you describe how this affects your daily activities?",
+        "That's helpful. Are there any other symptoms you've noticed?",
+        "Thank you for sharing. Has this happened before, or is this the first time?",
+        "I understand. On a scale of 1-10, how would you rate the severity?",
+    ];
+
+    return followUps[Math.floor(Math.random() * followUps.length)];
 }
 
 export async function POST(request: NextRequest) {
@@ -103,44 +127,48 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // Try Gemini AI (FREE!)
+        // Try Gemini AI
         const geminiApiKey = process.env.GEMINI_API_KEY;
         if (geminiApiKey) {
             try {
                 const genAI = new GoogleGenerativeAI(geminiApiKey);
                 const model = genAI.getGenerativeModel({
                     model: 'gemini-1.5-flash',
-                    generationConfig: { maxOutputTokens: 120 }
+                    generationConfig: { maxOutputTokens: 150 }
                 });
 
-                const prompt = `You are a ${doc.title}. Your specialty: ${doc.scope.slice(0, 6).join(', ')}.
+                const prompt = `You are a ${doc.title} having a medical consultation. Your specialty includes: ${doc.scope.slice(0, 6).join(', ')}.
 
 RULES:
-- Speak ONLY English
-- Do NOT recommend or mention any medicines
-- Just ask questions to understand the patient's condition
-- Keep responses to 2 short sentences
-- Be warm and professional
-- Ask about duration, severity, or related symptoms
+- Respond ONLY in English
+- Do NOT recommend or mention any medicines or treatments
+- Ask follow-up questions to understand the patient's condition better
+- Keep response to 2-3 short sentences
+- Be warm, empathetic and professional
+- Ask about: duration, severity, triggers, other symptoms
 
 Patient says: "${message}"
 
-Respond naturally:`;
+Your response:`;
 
                 const result = await model.generateContent(prompt);
-                return NextResponse.json({ success: true, message: result.response.text() });
+                const responseText = result.response.text();
 
+                if (responseText && responseText.trim()) {
+                    return NextResponse.json({ success: true, message: responseText.trim() });
+                }
             } catch (error) {
                 console.error('Gemini API error:', error);
-                // Fall through to fallback response
+                // Continue to smart fallback
             }
         }
 
-        // Fallback to rule-based responses if no API key or API fails
-        return NextResponse.json({ success: true, message: getResponse(message, specialty) });
+        // Smart fallback responses
+        return NextResponse.json({ success: true, message: getSmartResponse(message, specialty) });
 
-    } catch {
-        return NextResponse.json({ success: true, message: "Please describe your symptoms again." });
+    } catch (error) {
+        console.error('Chat API error:', error);
+        return NextResponse.json({ success: true, message: "I'm sorry, could you please repeat that?" });
     }
 }
 
