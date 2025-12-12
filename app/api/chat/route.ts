@@ -63,10 +63,14 @@ function getSmartResponse(message: string, specialty: string): string {
         return `Hello! I'm your ${doc.title}. What symptoms are you experiencing today?`;
     }
 
-    // Handle short answers like "no", "yes"
-    if (lower === 'no' || lower === 'nope' || lower === 'not really' || lower === 'nothing') {
-        return "Alright, based on what you've described, I'd recommend a proper examination. Is there anything else you'd like to discuss?";
+    // Handle end of conversation
+    if (lower === 'no' || lower === 'nope' || lower === 'not really' || lower === 'nothing' ||
+        lower === 'no other' || lower === 'no concern' || lower.includes('that\'s all') ||
+        lower.includes('thats all') || lower.includes('done') || lower.includes('finished') ||
+        lower.includes('end') || lower.includes('stop') || lower.includes('nothing else')) {
+        return "Thank you for sharing all that information. I have a good understanding of your symptoms now. Please click 'Get Prescription' to receive your personalized medical report and recommendations.";
     }
+
     if (lower === 'yes' || lower === 'yeah' || lower === 'yep' || lower === 'ok') {
         return "Can you tell me more about that?";
     }
@@ -163,15 +167,18 @@ export async function POST(request: NextRequest) {
             try {
                 const ai = new GoogleGenAI({ apiKey: geminiApiKey });
 
-                const prompt = `You are a ${doc.title} having a medical consultation. Your specialty includes: ${doc.scope.slice(0, 6).join(', ')}.
+                const prompt = `You are a ${doc.title} in a voice medical consultation. Your specialty: ${doc.scope.slice(0, 6).join(', ')}.
 
 RULES:
 - Respond ONLY in English
-- Do NOT recommend or mention any medicines or treatments
-- Ask follow-up questions to understand the patient's condition better
-- Keep response to 2-3 short sentences
+- Do NOT recommend or mention any medicines
+- Keep responses short (2-3 sentences max)
 - Be warm, empathetic and professional
-- Ask about: duration, severity, triggers, other symptoms
+
+CONVERSATION FLOW:
+- If patient just started or described symptoms: Ask 1-2 follow-up questions about duration, severity, or triggers
+- If patient has already answered multiple questions (3+ exchanges): Summarize what you understood and say "I have enough information. You can click 'Get Prescription' to receive your medical report."
+- If patient says "no", "nothing else", "that's all", "done", "finished", "end", "stop": Respond with "Thank you for sharing. I have enough information to help you. Please click 'Get Prescription' to receive your personalized medical report and recommendations."
 
 Patient says: "${message}"
 
