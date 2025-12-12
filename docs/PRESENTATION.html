@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Medical Voice Agent - Project Presentation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+        }
+        
+        .slide {
+            width: 100%;
+            min-height: 100vh;
+            padding: 60px 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            page-break-after: always;
+            border-bottom: 3px solid #4a4a6a;
+        }
+        
+        .slide-title {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .slide-content {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+        
+        .slide-diagram {
+            background: #0f0f23;
+        }
+        
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        h2 {
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            color: #00d4ff;
+            border-bottom: 3px solid #00d4ff;
+            padding-bottom: 15px;
+        }
+        
+        h3 {
+            font-size: 1.8rem;
+            color: #00ff88;
+            margin: 20px 0;
+        }
+        
+        p, li {
+            font-size: 1.4rem;
+            line-height: 1.8;
+            color: #e0e0e0;
+        }
+        
+        ul {
+            padding-left: 40px;
+            margin: 20px 0;
+        }
+        
+        li {
+            margin: 15px 0;
+        }
+        
+        .highlight {
+            color: #00ff88;
+            font-weight: bold;
+        }
+        
+        .center {
+            text-align: center;
+        }
+        
+        .subtitle {
+            font-size: 1.8rem;
+            color: #b0b0b0;
+            margin-bottom: 30px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            margin-top: 30px;
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .card h3 {
+            margin-top: 0;
+        }
+        
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .tech-badge {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 1.1rem;
+        }
+        
+        .diagram-box {
+            background: #1a1a2e;
+            border: 2px solid #4a4a6a;
+            border-radius: 10px;
+            padding: 30px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            white-space: pre;
+            overflow-x: auto;
+            line-height: 1.4;
+            color: #00ff88;
+        }
+        
+        .slide-number {
+            position: absolute;
+            bottom: 30px;
+            right: 50px;
+            font-size: 1rem;
+            color: #666;
+        }
+        
+        .authors {
+            margin-top: 40px;
+            font-size: 1.2rem;
+            color: #888;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        th, td {
+            padding: 15px 20px;
+            text-align: left;
+            border: 1px solid #4a4a6a;
+        }
+        
+        th {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            font-size: 1.2rem;
+        }
+        
+        td {
+            font-size: 1.1rem;
+            background: rgba(255,255,255,0.03);
+        }
+        
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+        }
+        
+        @media print {
+            .slide {
+                page-break-after: always;
+                height: 100vh;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- SLIDE 1: Title -->
+<div class="slide slide-title center">
+    <h1>🏥 AI Medical Voice Agent</h1>
+    <p class="subtitle">Voice-Powered Medical Consultation System</p>
+    <p style="font-size: 1.5rem; margin-top: 30px;">
+        A Real-Time AI Healthcare Solution for Rwanda
+    </p>
+    <div class="tech-stack" style="justify-content: center; margin-top: 50px;">
+        <span class="tech-badge">Next.js 16</span>
+        <span class="tech-badge">TypeScript</span>
+        <span class="tech-badge">Google Gemini AI</span>
+        <span class="tech-badge">Web Speech API</span>
+    </div>
+    <p class="authors">Final Exam Project | December 2024</p>
+</div>
+
+<!-- SLIDE 2: Problem Statement -->
+<div class="slide slide-content">
+    <h2>📋 Problem Statement</h2>
+    <div class="grid">
+        <div class="card">
+            <h3>🏥 Healthcare Challenge</h3>
+            <ul>
+                <li>Limited access to medical professionals</li>
+                <li>Long waiting times at hospitals</li>
+                <li>Lack of immediate health guidance</li>
+                <li>Language barriers in healthcare</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h3>💡 Our Solution</h3>
+            <ul>
+                <li>24/7 AI-powered medical consultation</li>
+                <li>Voice-based interaction (hands-free)</li>
+                <li>Multiple specialist doctors</li>
+                <li>Instant personalized prescriptions</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 3: Key Features -->
+<div class="slide slide-content">
+    <h2>✨ Key Features</h2>
+    <div class="grid">
+        <div class="card">
+            <div class="feature-icon">🎙️</div>
+            <h3>Voice Recognition</h3>
+            <p>Real-time speech-to-text using Web Speech API with auto-silence detection</p>
+        </div>
+        <div class="card">
+            <div class="feature-icon">🤖</div>
+            <h3>AI Doctor</h3>
+            <p>Powered by Google Gemini 2.5 Flash for intelligent medical responses</p>
+        </div>
+        <div class="card">
+            <div class="feature-icon">👨‍⚕️</div>
+            <h3>5 Specialists</h3>
+            <p>General, Eye, Bone, Lung, and Stomach doctors available</p>
+        </div>
+        <div class="card">
+            <div class="feature-icon">📋</div>
+            <h3>Prescriptions</h3>
+            <p>Downloadable medical reports with recommended treatments</p>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 4: Technology Stack -->
+<div class="slide slide-content">
+    <h2>🛠️ Technology Stack</h2>
+    <table>
+        <tr>
+            <th>Layer</th>
+            <th>Technology</th>
+            <th>Purpose</th>
+        </tr>
+        <tr>
+            <td>Frontend</td>
+            <td>Next.js 16, React 19, TypeScript</td>
+            <td>User Interface</td>
+        </tr>
+        <tr>
+            <td>Styling</td>
+            <td>Tailwind CSS, Motion (Framer)</td>
+            <td>UI Design & Animations</td>
+        </tr>
+        <tr>
+            <td>Authentication</td>
+            <td>NextAuth.js, Google OAuth</td>
+            <td>User Login</td>
+        </tr>
+        <tr>
+            <td>Database</td>
+            <td>Neon PostgreSQL, Drizzle ORM</td>
+            <td>Data Storage</td>
+        </tr>
+        <tr>
+            <td>AI</td>
+            <td>Google Gemini 2.5 Flash</td>
+            <td>Medical Responses</td>
+        </tr>
+        <tr>
+            <td>Voice</td>
+            <td>Web Speech API</td>
+            <td>Speech Recognition & Synthesis</td>
+        </tr>
+        <tr>
+            <td>Deployment</td>
+            <td>Vercel, Docker</td>
+            <td>Hosting & Containerization</td>
+        </tr>
+    </table>
+</div>
+
+<!-- SLIDE 5: Activity Diagram -->
+<div class="slide slide-diagram">
+    <h2>📊 Activity Diagram</h2>
+    <div class="diagram-box">
+                              ┌─────────┐
+                              │  START  │
+                              └────┬────┘
+                                   │
+                                   ▼
+                        ┌──────────────────┐
+                        │ User Opens App   │
+                        └────────┬─────────┘
+                                 │
+                                 ▼
+                        ┌──────────────────┐     NO     ┌──────────────┐
+                        │ Is User Logged?  │───────────▶│ Show Login   │
+                        └────────┬─────────┘            └──────┬───────┘
+                                 │ YES                         │
+                                 ▼                             │
+                        ┌──────────────────┐                   │
+                        │ Show Dashboard   │◀──────────────────┘
+                        └────────┬─────────┘
+                                 │
+                                 ▼
+                        ┌──────────────────┐
+                        │ Select Specialty │
+                        └────────┬─────────┘
+                                 │
+                                 ▼
+                     ┌─────────────────────────┐
+                     │   CONSULTATION LOOP     │
+                     │  ┌───────────────────┐  │
+                     │  │ User Speaks       │  │
+                     │  └─────────┬─────────┘  │
+                     │            ▼            │
+                     │  ┌───────────────────┐  │
+                     │  │ AI Responds       │  │
+                     │  └─────────┬─────────┘  │
+                     │            ▼            │
+                     │  ┌───────────────────┐  │
+                     │  │ More Questions?   │──┼──▶ NO ──▶ Get Prescription
+                     │  └───────────────────┘  │              │
+                     └─────────────────────────┘              ▼
+                                                         ┌─────────┐
+                                                         │   END   │
+                                                         └─────────┘
+    </div>
+</div>
+
+<!-- SLIDE 6: Data Flow Diagram -->
+<div class="slide slide-diagram">
+    <h2>📊 Data Flow Diagram (Level 1)</h2>
+    <div class="diagram-box">
+┌────────────────────────────────────────────────────────────────────────────┐
+│                              SYSTEM BOUNDARY                                │
+│                                                                            │
+│  ┌─────────┐   Voice    ┌────────────────┐              ┌──────────────┐  │
+│  │         │───────────▶│ 1.0 Speech     │──Transcript─▶│ 2.0 Chat     │  │
+│  │         │            │ Recognition    │              │ API Handler  │  │
+│  │  USER   │            └────────────────┘              └──────┬───────┘  │
+│  │         │                                                   │          │
+│  │         │◀──Voice Response───────────────────────────┐      ▼          │
+│  └─────────┘                                            │ ┌──────────────┐│
+│       │                                                 │ │ 3.0 Gemini  ││
+│       │                                                 │ │ AI Service  ││
+│       │      ┌──────────────┐         ┌─────────────┐   │ └──────┬───────┘│
+│       │      │ 4.0 Auth     │         │ D1: Users   │   │        │        │
+│       └─────▶│ System       │────────▶│ Database    │   │        │        │
+│              └──────────────┘         └─────────────┘   │        │        │
+│                                                         │        │        │
+│              ┌──────────────┐         ┌─────────────┐   │        │        │
+│              │ 5.0 History  │◀───────▶│ D2: Consult │◀──┴────────┘        │
+│              │ Manager      │         │ Database    │                     │
+│              └──────────────┘         └─────────────┘                     │
+└────────────────────────────────────────────────────────────────────────────┘
+    </div>
+</div>
+
+<!-- SLIDE 7: Sequence Diagram -->
+<div class="slide slide-diagram">
+    <h2>📊 Sequence Diagram</h2>
+    <div class="diagram-box" style="font-size: 0.8rem;">
+┌──────┐      ┌─────────────┐      ┌─────────┐      ┌──────────┐      ┌────────┐
+│ User │      │ Consultation│      │ Chat    │      │ Gemini   │      │Database│
+└──┬───┘      └──────┬──────┘      └────┬────┘      └────┬─────┘      └───┬────┘
+   │                 │                  │                │                │
+   │ Select Doctor   │                  │                │                │
+   │────────────────▶│                  │                │                │
+   │                 │ Init Speech      │                │                │
+   │                 │◀────────────────▶│                │                │
+   │ ◀───Greeting────│                  │                │                │
+   │                 │                  │                │                │
+   │ Speak Symptoms  │                  │                │                │
+   │────────────────▶│                  │                │                │
+   │                 │ POST /api/chat   │                │                │
+   │                 │─────────────────▶│                │                │
+   │                 │                  │ generateContent│                │
+   │                 │                  │───────────────▶│                │
+   │                 │                  │ AI Response    │                │
+   │                 │                  │◀───────────────│                │
+   │                 │ Response         │                │                │
+   │                 │◀─────────────────│                │                │
+   │ ◀──Voice Reply──│                  │                │                │
+   │                 │                  │                │                │
+   │ "That's all"    │                  │                │                │
+   │────────────────▶│                  │                │                │
+   │                 │                  │                │                │
+   │ Get Prescription│                  │                │                │
+   │────────────────▶│                  │  Save Record   │                │
+   │                 │                  │───────────────────────────────▶│
+   │ ◀──Report PDF───│                  │                │                │
+└──┴───┘      └──────┴──────┘      └────┴────┘      └────┴─────┘      └───┴────┘
+    </div>
+</div>
+
+<!-- SLIDE 8: Design Patterns -->
+<div class="slide slide-content">
+    <h2>🎨 Design Patterns Used</h2>
+    <div class="grid">
+        <div class="card">
+            <h3>🔔 Observer Pattern</h3>
+            <p>Voice recognition events (onresult, onend, onerror)</p>
+        </div>
+        <div class="card">
+            <h3>📋 Strategy Pattern</h3>
+            <p>Different specialist doctors with unique behaviors</p>
+        </div>
+        <div class="card">
+            <h3>🔗 Singleton Pattern</h3>
+            <p>Single database connection instance</p>
+        </div>
+        <div class="card">
+            <h3>🏭 Factory Pattern</h3>
+            <p>Authentication provider creation</p>
+        </div>
+        <div class="card">
+            <h3>📦 Module Pattern</h3>
+            <p>Organized code in lib/ and config/ folders</p>
+        </div>
+        <div class="card">
+            <h3>🛡️ Proxy Pattern</h3>
+            <p>Middleware for route protection</p>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 9: Testing -->
+<div class="slide slide-content">
+    <h2>🧪 Testing Plan</h2>
+    <table>
+        <tr>
+            <th>Test Type</th>
+            <th>Framework</th>
+            <th>Tests</th>
+            <th>Status</th>
+        </tr>
+        <tr>
+            <td>Unit Tests</td>
+            <td>Jest</td>
+            <td>40 tests</td>
+            <td style="color: #00ff88;">✅ PASSED</td>
+        </tr>
+        <tr>
+            <td>Chat API Tests</td>
+            <td>Jest</td>
+            <td>28 tests</td>
+            <td style="color: #00ff88;">✅ PASSED</td>
+        </tr>
+        <tr>
+            <td>Auth Tests</td>
+            <td>Jest</td>
+            <td>12 tests</td>
+            <td style="color: #00ff88;">✅ PASSED</td>
+        </tr>
+    </table>
+    <h3 style="margin-top: 30px;">Test Categories:</h3>
+    <ul>
+        <li><span class="highlight">Specialist Matching</span> - Correctly routes symptoms to doctors</li>
+        <li><span class="highlight">Greeting Detection</span> - Identifies pure greetings vs symptoms</li>
+        <li><span class="highlight">End Conversation</span> - Detects when user is done</li>
+        <li><span class="highlight">Password Validation</span> - Validates auth requirements</li>
+    </ul>
+</div>
+
+<!-- SLIDE 10: Docker & Deployment -->
+<div class="slide slide-content">
+    <h2>🐳 Docker & Deployment</h2>
+    <div class="grid">
+        <div class="card">
+            <h3>📦 Docker Configuration</h3>
+            <ul>
+                <li>Multi-stage Dockerfile</li>
+                <li>docker-compose.yml for orchestration</li>
+                <li>.dockerignore for optimization</li>
+                <li>Standalone Next.js output</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h3>🚀 Deployment</h3>
+            <ul>
+                <li><span class="highlight">Vercel</span> - Production hosting</li>
+                <li><span class="highlight">GitHub</span> - Version control</li>
+                <li><span class="highlight">Neon</span> - Database hosting</li>
+                <li>Auto-deploy on push</li>
+            </ul>
+        </div>
+    </div>
+    <div class="diagram-box" style="margin-top: 30px; font-size: 1rem;">
+# Run with Docker
+docker-compose up --build
+
+# Or manually
+docker build -t ai-medical-voice-agent .
+docker run -p 3000:3000 --env-file .env ai-medical-voice-agent
+    </div>
+</div>
+
+<!-- SLIDE 11: Demo Screenshots -->
+<div class="slide slide-content">
+    <h2>📱 Application Screenshots</h2>
+    <div class="grid">
+        <div class="card center">
+            <div class="feature-icon">🏠</div>
+            <h3>Landing Page</h3>
+            <p>Beautiful hero section with feature highlights</p>
+        </div>
+        <div class="card center">
+            <div class="feature-icon">📊</div>
+            <h3>Dashboard</h3>
+            <p>Specialist selection & quick actions</p>
+        </div>
+        <div class="card center">
+            <div class="feature-icon">🎙️</div>
+            <h3>Consultation</h3>
+            <p>Voice chat with AI doctor</p>
+        </div>
+        <div class="card center">
+            <div class="feature-icon">📋</div>
+            <h3>Prescription</h3>
+            <p>Downloadable medical report</p>
+        </div>
+    </div>
+    <p style="text-align: center; margin-top: 30px; color: #888;">
+        Live Demo: <span class="highlight">https://medical-ai-ea2f.vercel.app</span>
+    </p>
+</div>
+
+<!-- SLIDE 12: Conclusion -->
+<div class="slide slide-title center">
+    <h2>🎯 Conclusion</h2>
+    <div style="max-width: 800px; margin: 0 auto; text-align: left;">
+        <ul>
+            <li>✅ Real-life healthcare problem solved</li>
+            <li>✅ Modern technology stack (Next.js, TypeScript, AI)</li>
+            <li>✅ 6 Design patterns implemented & documented</li>
+            <li>✅ 40 unit tests passing</li>
+            <li>✅ Docker containerization ready</li>
+            <li>✅ Deployed on Vercel</li>
+        </ul>
+    </div>
+    <h3 style="margin-top: 50px; color: #00ff88;">Thank You! 🙏</h3>
+    <p style="margin-top: 20px; font-size: 1.2rem; color: #888;">
+        Questions & Demo Time
+    </p>
+</div>
+
+</body>
+</html>
