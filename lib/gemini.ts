@@ -1,28 +1,23 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { MEDICAL_SYSTEM_PROMPT, generateMedicalPrompt } from './ai-prompt';
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function getMedicalResponse(transcript: string): Promise<string> {
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            throw new Error('GEMINI_API_KEY not found');
+        }
 
-        const chat = model.startChat({
-            history: [
-                {
-                    role: 'user',
-                    parts: [{ text: 'You are a medical assistant. Please acknowledge and follow these instructions.' }],
-                },
-                {
-                    role: 'model',
-                    parts: [{ text: MEDICAL_SYSTEM_PROMPT }],
-                },
-            ],
+        const ai = new GoogleGenAI({ apiKey });
+
+        const prompt = `${MEDICAL_SYSTEM_PROMPT}\n\n${generateMedicalPrompt(transcript)}`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.0-flash',
+            contents: prompt,
         });
 
-        const result = await chat.sendMessage(generateMedicalPrompt(transcript));
-        const response = await result.response;
-        return response.text();
+        return response.text || 'I could not generate a response.';
     } catch (error) {
         console.error('Error getting AI response:', error);
         throw new Error('Failed to get AI response');
