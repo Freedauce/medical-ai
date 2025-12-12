@@ -9,7 +9,6 @@ import {
     IconHeart,
     IconEye,
     IconBone,
-    IconBrain,
     IconLungs,
     IconApple,
     IconShieldCheck
@@ -36,13 +35,6 @@ const specialties = [
         icon: IconBone,
         color: "from-orange-500 to-amber-500",
         description: "Bones, joints, muscles, back pain",
-    },
-    {
-        id: "neurology",
-        name: "Neurology",
-        icon: IconBrain,
-        color: "from-purple-500 to-violet-500",
-        description: "Headaches, nerves, brain health",
     },
     {
         id: "respiratory",

@@ -18,7 +18,6 @@ import {
     IconHeart,
     IconEye,
     IconBone,
-    IconBrain,
     IconLungs,
     IconApple,
     IconArrowRight,
@@ -37,7 +36,6 @@ const SPECIALISTS: Record<string, { title: string; icon: React.ElementType; colo
     general: { title: "General Doctor", icon: IconHeart, color: "from-red-500 to-pink-500", medicines: ["Paracetamol 500mg - Take 1 tablet every 6 hours", "Ibuprofen 400mg - Take 1 twice daily with food", "Vitamin C 1000mg - Take 1 daily"] },
     eye: { title: "Eye Doctor", icon: IconEye, color: "from-blue-500 to-cyan-500", medicines: ["Artificial Tears - Apply 1-2 drops 4 times daily", "Tobramycin drops - 1 drop 3 times daily for 7 days"] },
     orthopedic: { title: "Bone Doctor", icon: IconBone, color: "from-orange-500 to-amber-500", medicines: ["Diclofenac 50mg - 1 tablet twice daily", "Calcium + Vitamin D - 1 tablet daily", "Ice pack 15 mins, 3 times daily"] },
-    neurology: { title: "Brain Doctor", icon: IconBrain, color: "from-purple-500 to-violet-500", medicines: ["Sumatriptan 50mg - 1 at migraine onset", "Amitriptyline 25mg - 1 at bedtime"] },
     respiratory: { title: "Lung Doctor", icon: IconLungs, color: "from-teal-500 to-emerald-500", medicines: ["Salbutamol inhaler - 2 puffs when needed", "Amoxicillin 500mg - 1 tablet 3 times daily"] },
     digestive: { title: "Stomach Doctor", icon: IconApple, color: "from-yellow-500 to-lime-500", medicines: ["Omeprazole 20mg - 1 before breakfast", "Loperamide 2mg - 2 initially, 1 after each loose stool"] },
 };

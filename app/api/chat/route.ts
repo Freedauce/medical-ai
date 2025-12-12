@@ -22,11 +22,6 @@ const SPECIALISTS: Record<string, {
         scope: ["bone", "joint", "muscle", "back", "spine", "knee", "shoulder", "fracture", "arthritis", "sprain", "ankle", "wrist", "hip", "leg", "arm"],
         medicines: ["Diclofenac 50mg", "Calcium + Vitamin D", "Glucosamine"]
     },
-    neurology: {
-        title: "Brain Doctor",
-        scope: ["headache", "migraine", "dizzy", "vertigo", "seizure", "numbness", "tingling", "memory", "brain", "nerve", "tremor", "head"],
-        medicines: ["Sumatriptan 50mg", "Amitriptyline 25mg", "Gabapentin 300mg"]
-    },
     respiratory: {
         title: "Lung Doctor",
         scope: ["cough", "breathing", "asthma", "bronchitis", "chest", "lung", "wheeze", "shortness of breath", "pneumonia", "cold", "flu", "breath"],
