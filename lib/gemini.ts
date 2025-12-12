@@ -13,7 +13,7 @@ export async function getMedicalResponse(transcript: string): Promise<string> {
         const prompt = `${MEDICAL_SYSTEM_PROMPT}\n\n${generateMedicalPrompt(transcript)}`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-2.5-flash',
             contents: prompt,
         });
 
