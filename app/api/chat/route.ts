@@ -51,13 +51,29 @@ function findMatchingSpecialist(message: string): { key: string; title: string }
     return null;
 }
 
+// Check if message is ONLY a greeting
+function isOnlyGreeting(msg: string): boolean {
+    const m = msg.toLowerCase().trim();
+    const pureGreetings = ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening', 'hi doctor', 'hello doctor'];
+    return pureGreetings.includes(m) || pureGreetings.some(g => m === g + '!' || m === g + '.');
+}
+
 // Better fallback responses based on context
 function getSmartResponse(message: string, specialty: string): string {
     const doc = SPECIALISTS[specialty] || SPECIALISTS.general;
-    const lower = message.toLowerCase();
+    const lower = message.toLowerCase().trim();
 
-    if (lower.includes('hello') || lower.includes('hi') || message.length < 8) {
+    // Only respond with greeting for PURE greetings
+    if (isOnlyGreeting(message)) {
         return `Hello! I'm your ${doc.title}. What symptoms are you experiencing today?`;
+    }
+
+    // Handle short answers like "no", "yes"
+    if (lower === 'no' || lower === 'nope' || lower === 'not really' || lower === 'nothing') {
+        return "Alright, based on what you've described, I'd recommend a proper examination. Is there anything else you'd like to discuss?";
+    }
+    if (lower === 'yes' || lower === 'yeah' || lower === 'yep' || lower === 'ok') {
+        return "Can you tell me more about that?";
     }
 
     if (lower.includes('thank')) {
@@ -89,6 +105,23 @@ function getSmartResponse(message: string, specialty: string): string {
         return "Blurry vision can have many causes. Is it in one eye or both? Do you wear glasses or contacts?";
     }
 
+    // Eye-specific symptoms
+    if (lower.includes('cry') || lower.includes('tear') || lower.includes('watery')) {
+        return "Excessive tearing can have various causes like allergies or blocked tear ducts. Is there any itching, redness, or discharge?";
+    }
+
+    if (lower.includes('can\'t look') || lower.includes('cannot look') || lower.includes('look well')) {
+        return "Can you describe what happens when you try to see? Is it blurry, double vision, or something else?";
+    }
+
+    if (lower.includes('disease') || lower.includes('problem') || lower.includes('issue') || lower.includes('trouble')) {
+        return "I understand. Can you describe specifically what you're experiencing? For example, is it pain, blurriness, or something else?";
+    }
+
+    if (lower.includes('poor vision') || lower.includes('vision problem')) {
+        return "Vision problems need careful evaluation. Is it constant or does it come and go? One eye or both?";
+    }
+
     // Default follow-up questions
     const followUps = [
         "I see. Can you describe how this affects your daily activities?",
@@ -114,8 +147,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: true, message: "I didn't catch that. Please repeat." });
         }
 
-        const lower = message.toLowerCase();
-        const isGreeting = lower.includes('hello') || lower.includes('hi') || lower.includes('thank') || message.length < 10;
+        const lower = message.toLowerCase().trim();
+        const isGreeting = isOnlyGreeting(message) || lower.includes('thank');
 
         // Check if symptoms match a different specialist
         const matchingSpec = findMatchingSpecialist(message);
