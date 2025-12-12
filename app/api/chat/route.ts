@@ -129,6 +129,8 @@ export async function POST(request: NextRequest) {
 
         // Try Gemini AI
         const geminiApiKey = process.env.GEMINI_API_KEY;
+        console.log('Gemini API Key present:', !!geminiApiKey, 'Length:', geminiApiKey?.length || 0);
+
         if (geminiApiKey) {
             try {
                 const genAI = new GoogleGenerativeAI(geminiApiKey);
@@ -151,16 +153,20 @@ Patient says: "${message}"
 
 Your response:`;
 
+                console.log('Sending request to Gemini...');
                 const result = await model.generateContent(prompt);
                 const responseText = result.response.text();
+                console.log('Gemini response received, length:', responseText?.length || 0);
 
                 if (responseText && responseText.trim()) {
                     return NextResponse.json({ success: true, message: responseText.trim() });
                 }
             } catch (error) {
-                console.error('Gemini API error:', error);
+                console.error('Gemini API error details:', error instanceof Error ? error.message : String(error));
                 // Continue to smart fallback
             }
+        } else {
+            console.log('No GEMINI_API_KEY found in environment');
         }
 
         // Smart fallback responses
