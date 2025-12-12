@@ -11,7 +11,7 @@
   "dependencies": {
     "@ai-sdk/groq": "^2.0.33",
     "@ai-sdk/openai": "^2.0.84",
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^1.33.0",
     "@neondatabase/serverless": "^1.0.2",
     "@radix-ui/react-slot": "^1.2.4",
     "@tabler/icons-react": "^3.35.0",

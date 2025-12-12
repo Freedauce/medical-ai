@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { getServerSession } from 'next-auth';
 
 const SPECIALISTS: Record<string, {
@@ -166,11 +166,7 @@ export async function POST(request: NextRequest) {
 
         if (geminiApiKey) {
             try {
-                const genAI = new GoogleGenerativeAI(geminiApiKey);
-                const model = genAI.getGenerativeModel({
-                    model: 'gemini-1.5-flash',
-                    generationConfig: { maxOutputTokens: 150 }
-                });
+                const ai = new GoogleGenAI({ apiKey: geminiApiKey });
 
                 const prompt = `You are a ${doc.title} having a medical consultation. Your specialty includes: ${doc.scope.slice(0, 6).join(', ')}.
 
@@ -187,8 +183,12 @@ Patient says: "${message}"
 Your response:`;
 
                 console.log('Sending request to Gemini...');
-                const result = await model.generateContent(prompt);
-                const responseText = result.response.text();
+                const response = await ai.models.generateContent({
+                    model: 'gemini-2.0-flash',
+                    contents: prompt,
+                });
+
+                const responseText = response.text;
                 console.log('Gemini response received, length:', responseText?.length || 0);
 
                 if (responseText && responseText.trim()) {
