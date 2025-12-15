@@ -67,7 +67,7 @@ function ConsultationContent() {
     const [report, setReport] = useState("");
     const [suggestedDoctor, setSuggestedDoctor] = useState<string | null>(null);
     const [textInput, setTextInput] = useState("");
-    const [showTextInput, setShowTextInput] = useState(false);
+    const [showTextInput, setShowTextInput] = useState(true);
 
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -166,8 +166,7 @@ function ConsultationContent() {
         utterance.onend = () => {
             setIsSpeaking(false);
             onComplete?.();
-            // Auto-start listening after speaking
-            setTimeout(() => startListening(), 300);
+            // No auto-listening - user must click mic button
         };
         utterance.onerror = () => {
             setIsSpeaking(false);
@@ -263,39 +262,55 @@ function ConsultationContent() {
         const consultation = messages.filter(m => m.role === "assistant" && !m.redirect).slice(1).map(m => `• ${m.content}`).join("\n");
 
         setReport(`
-══════════════════════════════════════════════════
-              MEDICAL PRESCRIPTION
-              Rwanda Digital Health
-══════════════════════════════════════════════════
+╔══════════════════════════════════════════════════╗
+║                                                  ║
+║           🏥 KIGALI AI MEDICAL                   ║
+║         AI-Powered Health Consultation           ║
+║                                                  ║
+╚══════════════════════════════════════════════════╝
 
-Date: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-Time: ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-Specialist: ${doc.title}
+📋 MEDICAL PRESCRIPTION REPORT
+──────────────────────────────────────────────────
+
+📅 Date: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+🕐 Time: ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+👨‍⚕️ Specialist: ${doc.title}
 
 ──────────────────────────────────────────────────
-PATIENT SYMPTOMS:
+🩺 PATIENT SYMPTOMS:
 ──────────────────────────────────────────────────
 ${symptoms || "None recorded"}
 
 ──────────────────────────────────────────────────
-CONSULTATION NOTES:
+📝 CONSULTATION NOTES:
 ──────────────────────────────────────────────────
 ${consultation || "None recorded"}
 
 ──────────────────────────────────────────────────
-PRESCRIBED MEDICINES:
+💊 PRESCRIBED MEDICINES:
 ──────────────────────────────────────────────────
 ${doc.medicines.map((m, i) => `${i + 1}. ${m}`).join("\n")}
 
 ──────────────────────────────────────────────────
-INSTRUCTIONS:
+📌 INSTRUCTIONS:
 ──────────────────────────────────────────────────
 • Take all medicines as prescribed
 • Complete full course of treatment
-• Return if symptoms persist
-• Emergency: Call 912
+• Return if symptoms persist after 7 days
+• Keep hydrated and get adequate rest
+• Emergency Contact: Call 912 (Rwanda)
 
 ══════════════════════════════════════════════════
+⚠️ DISCLAIMER: This is an AI-generated consultation.
+Please visit a licensed healthcare provider for
+final diagnosis and treatment.
+══════════════════════════════════════════════════
+
+🌐 Kigali AI Medical - www.kigali-ai-medical.rw
+📧 support@kigali-ai-medical.rw
+📞 +250 788 000 000
+
+© ${new Date().getFullYear()} Kigali AI Medical. All rights reserved.
 `);
         setShowReport(true);
     };
