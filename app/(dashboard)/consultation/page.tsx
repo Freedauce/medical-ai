@@ -25,6 +25,7 @@ import {
     IconKeyboard
 } from "@tabler/icons-react";
 import Link from "next/link";
+import { jsPDF } from "jspdf";
 
 interface Message {
     role: "user" | "assistant";
@@ -316,11 +317,159 @@ final diagnosis and treatment.
     };
 
     const downloadReport = () => {
-        const blob = new Blob([report], { type: 'text/plain' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `prescription-${specialty}-${Date.now()}.txt`;
-        a.click();
+        const pdf = new jsPDF();
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const margin = 20;
+        let y = 20;
+
+        // Header - Kigali AI Medical
+        pdf.setFillColor(37, 99, 235);
+        pdf.rect(0, 0, pageWidth, 45, 'F');
+
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(24);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('KIGALI AI MEDICAL', pageWidth / 2, 20, { align: 'center' });
+
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text('AI-Powered Health Consultation', pageWidth / 2, 32, { align: 'center' });
+
+        y = 55;
+
+        // Reset text color
+        pdf.setTextColor(0, 0, 0);
+
+        // Title
+        pdf.setFontSize(18);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('MEDICAL PRESCRIPTION REPORT', pageWidth / 2, y, { align: 'center' });
+        y += 15;
+
+        // Line
+        pdf.setDrawColor(37, 99, 235);
+        pdf.setLineWidth(0.5);
+        pdf.line(margin, y, pageWidth - margin, y);
+        y += 10;
+
+        // Details
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'normal');
+        const date = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+        pdf.text(`Date: ${date}`, margin, y);
+        y += 7;
+        pdf.text(`Time: ${time}`, margin, y);
+        y += 7;
+        pdf.text(`Specialist: ${doc.title}`, margin, y);
+        y += 15;
+
+        // Symptoms Section
+        pdf.setFillColor(240, 240, 240);
+        pdf.rect(margin, y - 5, pageWidth - 2 * margin, 10, 'F');
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('PATIENT SYMPTOMS', margin + 5, y + 2);
+        y += 15;
+
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        const symptoms = messages.filter(m => m.role === 'user').map(m => m.content);
+        symptoms.forEach(symptom => {
+            const lines = pdf.splitTextToSize(`• ${symptom}`, pageWidth - 2 * margin - 10);
+            lines.forEach((line: string) => {
+                if (y > 270) { pdf.addPage(); y = 20; }
+                pdf.text(line, margin + 5, y);
+                y += 6;
+            });
+        });
+        y += 10;
+
+        // Consultation Notes Section
+        if (y > 250) { pdf.addPage(); y = 20; }
+        pdf.setFillColor(240, 240, 240);
+        pdf.rect(margin, y - 5, pageWidth - 2 * margin, 10, 'F');
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('CONSULTATION NOTES', margin + 5, y + 2);
+        y += 15;
+
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        const notes = messages.filter(m => m.role === 'assistant' && !m.redirect).slice(1).map(m => m.content);
+        notes.forEach(note => {
+            const lines = pdf.splitTextToSize(`• ${note}`, pageWidth - 2 * margin - 10);
+            lines.forEach((line: string) => {
+                if (y > 270) { pdf.addPage(); y = 20; }
+                pdf.text(line, margin + 5, y);
+                y += 6;
+            });
+        });
+        y += 10;
+
+        // Prescribed Medicines Section
+        if (y > 230) { pdf.addPage(); y = 20; }
+        pdf.setFillColor(37, 99, 235);
+        pdf.rect(margin, y - 5, pageWidth - 2 * margin, 10, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('PRESCRIBED MEDICINES', margin + 5, y + 2);
+        y += 15;
+
+        pdf.setTextColor(0, 0, 0);
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        doc.medicines.forEach((med, i) => {
+            if (y > 270) { pdf.addPage(); y = 20; }
+            pdf.text(`${i + 1}. ${med}`, margin + 5, y);
+            y += 7;
+        });
+        y += 10;
+
+        // Instructions Section
+        if (y > 230) { pdf.addPage(); y = 20; }
+        pdf.setFillColor(240, 240, 240);
+        pdf.rect(margin, y - 5, pageWidth - 2 * margin, 10, 'F');
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('INSTRUCTIONS', margin + 5, y + 2);
+        y += 15;
+
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        const instructions = [
+            'Take all medicines as prescribed',
+            'Complete full course of treatment',
+            'Return if symptoms persist after 7 days',
+            'Keep hydrated and get adequate rest',
+            'Emergency Contact: Call 912 (Rwanda)'
+        ];
+        instructions.forEach(inst => {
+            pdf.text(`• ${inst}`, margin + 5, y);
+            y += 7;
+        });
+        y += 10;
+
+        // Disclaimer
+        if (y > 250) { pdf.addPage(); y = 20; }
+        pdf.setFillColor(255, 243, 205);
+        pdf.rect(margin, y - 5, pageWidth - 2 * margin, 25, 'F');
+        pdf.setFontSize(9);
+        pdf.setTextColor(133, 100, 4);
+        pdf.text('DISCLAIMER: This is an AI-generated consultation.', margin + 5, y + 3);
+        pdf.text('Please visit a licensed healthcare provider for final diagnosis and treatment.', margin + 5, y + 11);
+        y += 30;
+
+        // Footer
+        pdf.setTextColor(100, 100, 100);
+        pdf.setFontSize(9);
+        pdf.text('Kigali AI Medical | www.kigali-ai-medical.rw | support@kigali-ai-medical.rw', pageWidth / 2, 285, { align: 'center' });
+        pdf.text(`© ${new Date().getFullYear()} Kigali AI Medical. All rights reserved.`, pageWidth / 2, 292, { align: 'center' });
+
+        // Save the PDF
+        pdf.save(`Kigali-AI-Prescription-${Date.now()}.pdf`);
     };
 
     const resetConsultation = () => {
