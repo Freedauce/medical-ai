@@ -688,8 +688,9 @@ final diagnosis and treatment.
                 </div>
             </div>
 
+
             {/* Floating Get Prescription button for mobile */}
-            {messages.length > 2 && !showReport && !suggestedDoctor && (
+            {messages.length > 6 && !showReport && !suggestedDoctor && (
                 <motion.button
                     initial={{ opacity: 0, y: 50 }}
                     animate={{ opacity: 1, y: 0 }}

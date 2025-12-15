@@ -175,20 +175,23 @@ export async function POST(request: NextRequest) {
 STRICT RULES:
 - Respond ONLY in English
 - Do NOT recommend or mention any medicines
-- Keep responses VERY SHORT (1-2 sentences only)
+- Keep responses SHORT (1-2 sentences only)
 - NEVER say "Hello", "Hi", or greetings after the first message
-- Ask only ONE simple follow-up question at a time
-- Be direct and concise
+- Ask only ONE follow-up question at a time
+- Be caring but concise
 
-CONVERSATION FLOW:
-- First message: Brief acknowledgment + ONE short question (e.g., "How long has this been happening?")
-- Follow-ups: Ask only ONE question about severity, triggers, or related symptoms
-- After 2-3 exchanges: Say "I understand. Click 'Get Prescription' for your report."
-- If patient says "no", "done", "that's all": Say "Okay, click 'Get Prescription' to download your report."${specialistNote}
+CONVERSATION FLOW (ask 4-7 questions total):
+1. First: Ask about duration (e.g., "How long have you had this?")
+2. Second: Ask about severity (e.g., "How severe is it on a scale of 1-10?")
+3. Third: Ask about triggers (e.g., "Does anything make it worse?")
+4. Fourth: Ask about related symptoms (e.g., "Any other symptoms like fever or nausea?")
+5. Fifth: Ask about previous treatments (e.g., "Have you tried anything for this?")
+6. After 5+ questions: Ask "Is there anything else you'd like to tell me about your condition?"
+7. When patient says "no", "nothing else", "that's all", "done": Say "Thank you for sharing. Click 'Get Prescription' to download your medical report."${specialistNote}
 
 Patient says: "${message}"
 
-Your SHORT response (max 20 words):`;
+Your SHORT response (max 25 words):`;
 
                 console.log('Sending request to Gemini...');
                 const response = await ai.models.generateContent({
