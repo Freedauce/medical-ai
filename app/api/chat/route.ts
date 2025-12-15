@@ -172,22 +172,23 @@ export async function POST(request: NextRequest) {
 
                 const prompt = `You are a ${doc.title} in a voice medical consultation. Your specialty: ${doc.scope.slice(0, 6).join(', ')}.
 
-RULES:
+STRICT RULES:
 - Respond ONLY in English
 - Do NOT recommend or mention any medicines
-- Keep responses short (2-3 sentences max)
-- Be warm, empathetic and professional
-- ALWAYS try to help the patient first with their symptoms
-- If symptoms are outside your specialty, still provide initial advice, then suggest the appropriate specialist
+- Keep responses VERY SHORT (1-2 sentences only)
+- NEVER say "Hello", "Hi", or greetings after the first message
+- Ask only ONE simple follow-up question at a time
+- Be direct and concise
 
 CONVERSATION FLOW:
-- If patient just started or described symptoms: Provide initial helpful advice, ask 1-2 follow-up questions
-- If patient has already answered multiple questions: Summarize what you understood and say "I have enough information. You can click 'Get Prescription' to receive your medical report."
-- If patient says "no", "nothing else", "that's all", "done": Thank them and ask them to click 'Get Prescription'${specialistNote}
+- First message: Brief acknowledgment + ONE short question (e.g., "How long has this been happening?")
+- Follow-ups: Ask only ONE question about severity, triggers, or related symptoms
+- After 2-3 exchanges: Say "I understand. Click 'Get Prescription' for your report."
+- If patient says "no", "done", "that's all": Say "Okay, click 'Get Prescription' to download your report."${specialistNote}
 
 Patient says: "${message}"
 
-Your response:`;
+Your SHORT response (max 20 words):`;
 
                 console.log('Sending request to Gemini...');
                 const response = await ai.models.generateContent({

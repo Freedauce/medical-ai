@@ -687,6 +687,19 @@ final diagnosis and treatment.
                     </div>
                 </div>
             </div>
+
+            {/* Floating Get Prescription button for mobile */}
+            {messages.length > 2 && !showReport && !suggestedDoctor && (
+                <motion.button
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    onClick={generateReport}
+                    className="fixed bottom-24 right-4 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-5 py-3 text-white font-semibold shadow-2xl sm:hidden"
+                >
+                    <IconFileText className="h-5 w-5" />
+                    Get Prescription
+                </motion.button>
+            )}
         </div>
     );
 }
