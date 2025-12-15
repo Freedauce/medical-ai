@@ -31,6 +31,14 @@ interface Message {
     role: "user" | "assistant";
     content: string;
     redirect?: string;
+    referral?: { recommended: string; title: string };
+}
+
+interface Referral {
+    from: string;
+    to: string;
+    toTitle: string;
+    reason: string;
 }
 
 const SPECIALISTS: Record<string, { title: string; icon: React.ElementType; color: string; medicines: string[] }> = {
@@ -69,6 +77,7 @@ function ConsultationContent() {
     const [suggestedDoctor, setSuggestedDoctor] = useState<string | null>(null);
     const [textInput, setTextInput] = useState("");
     const [showTextInput, setShowTextInput] = useState(true);
+    const [referrals, setReferrals] = useState<Referral[]>([]);
 
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -223,11 +232,26 @@ function ConsultationContent() {
             });
             const data = await response.json();
 
-            if (data.redirect && data.redirect !== specialty) {
-                setSuggestedDoctor(data.redirect);
+            // Track referral if suggested
+            if (data.referral) {
+                setSuggestedDoctor(data.referral.recommended);
+                setReferrals(prev => [
+                    ...prev,
+                    {
+                        from: doc.title,
+                        to: data.referral.recommended,
+                        toTitle: data.referral.title,
+                        reason: trimmedText
+                    }
+                ]);
             }
 
-            setMessages(prev => [...prev, { role: "assistant", content: data.message, redirect: data.redirect }]);
+            setMessages(prev => [...prev, {
+                role: "assistant",
+                content: data.message,
+                redirect: data.redirect,
+                referral: data.referral
+            }]);
             speak(data.message);
         } catch {
             const errorMsg = "Sorry, I had trouble understanding. Please try again.";
@@ -261,6 +285,9 @@ function ConsultationContent() {
 
         const symptoms = messages.filter(m => m.role === "user").map(m => `• ${m.content}`).join("\n");
         const consultation = messages.filter(m => m.role === "assistant" && !m.redirect).slice(1).map(m => `• ${m.content}`).join("\n");
+        const referralsList = referrals.length > 0
+            ? `\n──────────────────────────────────────────────────\n🔄 SPECIALIST REFERRALS:\n──────────────────────────────────────────────────\n${referrals.map((r, i) => `${i + 1}. Referred from ${r.from} to ${r.toTitle}\n   Reason: ${r.reason}`).join("\n")}\n`
+            : "";
 
         setReport(`
 ╔══════════════════════════════════════════════════╗
@@ -300,7 +327,7 @@ ${doc.medicines.map((m, i) => `${i + 1}. ${m}`).join("\n")}
 • Return if symptoms persist after 7 days
 • Keep hydrated and get adequate rest
 • Emergency Contact: Call 912 (Rwanda)
-
+${referralsList}
 ══════════════════════════════════════════════════
 ⚠️ DISCLAIMER: This is an AI-generated consultation.
 Please visit a licensed healthcare provider for
@@ -451,6 +478,34 @@ final diagnosis and treatment.
             y += 7;
         });
         y += 10;
+
+        // Referrals Section (if any)
+        if (referrals.length > 0) {
+            if (y > 220) { pdf.addPage(); y = 20; }
+            pdf.setFillColor(147, 51, 234); // Purple color for referrals
+            pdf.rect(margin, y - 5, pageWidth - 2 * margin, 10, 'F');
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFontSize(12);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('SPECIALIST REFERRALS', margin + 5, y + 2);
+            y += 15;
+
+            pdf.setTextColor(0, 0, 0);
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'normal');
+            referrals.forEach((ref, i) => {
+                if (y > 265) { pdf.addPage(); y = 20; }
+                pdf.text(`${i + 1}. Referred from ${ref.from} to ${ref.toTitle}`, margin + 5, y);
+                y += 6;
+                const reasonLines = pdf.splitTextToSize(`   Reason: ${ref.reason}`, pageWidth - 2 * margin - 15);
+                reasonLines.forEach((line: string) => {
+                    pdf.text(line, margin + 5, y);
+                    y += 5;
+                });
+                y += 3;
+            });
+            y += 5;
+        }
 
         // Disclaimer
         if (y > 250) { pdf.addPage(); y = 20; }

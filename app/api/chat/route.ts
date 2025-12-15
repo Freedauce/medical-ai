@@ -149,15 +149,10 @@ export async function POST(request: NextRequest) {
         const lower = message.toLowerCase().trim();
         const isGreeting = isOnlyGreeting(message) || lower.includes('thank');
 
-        // Check if symptoms match a different specialist
+        // Check if symptoms might need a specialist (but don't redirect immediately)
         const matchingSpec = findMatchingSpecialist(message);
-        if (matchingSpec && matchingSpec.key !== specialty && !isGreeting) {
-            return NextResponse.json({
-                success: true,
-                message: `Those symptoms sound like they need our ${matchingSpec.title}. Please go back to the dashboard and select "${matchingSpec.title}" - they can help you better with this.`,
-                redirect: matchingSpec.key
-            });
-        }
+        const needsSpecialistReferral = matchingSpec && matchingSpec.key !== specialty && !isGreeting;
+        const suggestedSpecialist = needsSpecialistReferral ? matchingSpec : null;
 
         // Try Gemini AI
         const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -167,6 +162,14 @@ export async function POST(request: NextRequest) {
             try {
                 const ai = new GoogleGenAI({ apiKey: geminiApiKey });
 
+                // Build prompt with specialist awareness
+                let specialistNote = '';
+                if (suggestedSpecialist && specialty === 'general') {
+                    specialistNote = `\n\nNOTE: The patient's symptoms suggest they may benefit from seeing our ${suggestedSpecialist.title}. After providing initial advice, mention that you recommend they also consult with the ${suggestedSpecialist.title} for specialized care. Include this referral suggestion naturally in your response.`;
+                } else if (suggestedSpecialist) {
+                    specialistNote = `\n\nNOTE: These symptoms are slightly outside your specialty. Provide what help you can, but mention that you recommend seeing our ${suggestedSpecialist.title} for more specialized care related to these specific symptoms.`;
+                }
+
                 const prompt = `You are a ${doc.title} in a voice medical consultation. Your specialty: ${doc.scope.slice(0, 6).join(', ')}.
 
 RULES:
@@ -174,11 +177,13 @@ RULES:
 - Do NOT recommend or mention any medicines
 - Keep responses short (2-3 sentences max)
 - Be warm, empathetic and professional
+- ALWAYS try to help the patient first with their symptoms
+- If symptoms are outside your specialty, still provide initial advice, then suggest the appropriate specialist
 
 CONVERSATION FLOW:
-- If patient just started or described symptoms: Ask 1-2 follow-up questions about duration, severity, or triggers
-- If patient has already answered multiple questions (3+ exchanges): Summarize what you understood and say "I have enough information. You can click 'Get Prescription' to receive your medical report."
-- If patient says "no", "nothing else", "that's all", "done", "finished", "end", "stop": Respond with "Thank you for sharing. I have enough information to help you. Please click 'Get Prescription' to receive your personalized medical report and recommendations."
+- If patient just started or described symptoms: Provide initial helpful advice, ask 1-2 follow-up questions
+- If patient has already answered multiple questions: Summarize what you understood and say "I have enough information. You can click 'Get Prescription' to receive your medical report."
+- If patient says "no", "nothing else", "that's all", "done": Thank them and ask them to click 'Get Prescription'${specialistNote}
 
 Patient says: "${message}"
 
@@ -194,7 +199,15 @@ Your response:`;
                 console.log('Gemini response received, length:', responseText?.length || 0);
 
                 if (responseText && responseText.trim()) {
-                    return NextResponse.json({ success: true, message: responseText.trim() });
+                    // Include referral info in response metadata
+                    return NextResponse.json({
+                        success: true,
+                        message: responseText.trim(),
+                        referral: suggestedSpecialist ? {
+                            recommended: suggestedSpecialist.key,
+                            title: suggestedSpecialist.title
+                        } : null
+                    });
                 }
             } catch (error) {
                 console.error('Gemini API error details:', error instanceof Error ? error.message : String(error));
